@@ -23,8 +23,10 @@ func main() {
 	failOnError(err, "Failed to open a channel")
 	defer ch.Close()
 
-	// 30 Messages with random Priorities between 0 and 9
-	for msgs := 0; msgs < 20; msgs++ {
+	// 10 Messages with random Priorities between 0 and 9
+	header := make(amqp.Table)
+	header["x-delay"] = "5000"
+	for msgs := 0; msgs < 10; msgs++ {
 		prio := rand.Intn(31)
 		err = ch.Publish(
 			"msgs", // exchange

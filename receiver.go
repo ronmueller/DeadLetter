@@ -113,7 +113,6 @@ func main() {
 
 			// check if death headers exist
 			if v, ok := d.Headers["x-death"]; ok {
-
 				// check if headerdata exist
 				if _, ok := v.([]interface{}); ok {
 
@@ -129,6 +128,7 @@ func main() {
 							// not 5 retries reached
 							// send message back to the dead letter exchange
 							fmt.Printf("%d\n\n", retry)
+							// d.ttl = int32(10000)
 							d.Nack(false, false)
 						}
 					default:
@@ -150,41 +150,3 @@ func main() {
 	log.Printf(" [*] Waiting for messages. To exit press CTRL+C")
 	<-forever
 }
-
-/*
-map[
-	x-death:[
-		map[
-			queue:msgs.retry
-			reason:expired
-			routing-keys:[msg]
-			time:2018-02-26 15:37:26 +0100 CET
-			count:20
-			exchange:msgs.dead.letter
-		]
-		map[
-			routing-keys:[msg]
-			time:2018-02-26 15:37:21 +0100 CET
-			count:20
-			exchange:msgs
-			queue:msg
-			reason:rejected
-		]
-	]
-	x-first-death-exchange:msgs
-	x-first-death-queue:msg
-	x-first-death-reason:rejected
-]
-
-[map[
-	queue:msgs.retry
-	reason:expired
-	routing-keys:[msg]
-	time:2018-02-26 15:37:26 +0100 CET
-	count:22 exchange:msgs.dead.letter
-	]
-map[routing-keys:[msg] time:2018-02-26 15:37:21 +0100 CET count:22 exchange:msgs queue:msg reason:rejected]]
-
-
-
-*/
