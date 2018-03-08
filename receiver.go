@@ -23,80 +23,89 @@ func main() {
 	// -----------------------------------------------------------
 	// Normal Message Exchange and Queue
 	err = ch.ExchangeDeclare(
-		"msgs",   // name
-		"fanout", // type
-		false,    // durable
-		false,    // auto-deleted
-		false,    // internal
-		false,    // no-wait
-		nil,      // arguments
+		"standard.exchange", // name
+		"topic",             // type
+		false,               // durable
+		false,               // auto-deleted
+		false,               // internal
+		false,               // no-wait
+		nil,                 // arguments
 	)
 	failOnError(err, "Failed to declare an exchange")
 
+	// Dead Letter Exchange
 	args := make(amqp.Table)
-	args["x-dead-letter-exchange"] = "msgs.dead.letter"
-	_, err = ch.QueueDeclare(
-		"msg", // name
-		false, // durable
-		false, // delete when unused
-		false, // exclusive
-		false, // no-wait
-		args,  // arguments
+	args["x-delayed-type"] = "topic"
+	err = ch.ExchangeDeclare(
+		"dlx.exchange",      // name
+		"x-delayed-message", // type
+		false,               // durable
+		false,               // auto-deleted
+		false,               // internal
+		false,               // no-wait
+		args,                // arguments
 	)
-	failOnError(err, "Failed to declare a queue")
-
-	err = ch.QueueBind(
-		"msg",  // queue name
-		"#",    // routing key
-		"msgs", // exchange
-		false,
-		nil)
-	failOnError(err, "Failed to bind a queue")
+	failOnError(err, "Failed to declare an exchange")
 
 	// -----------------------------------------------------------
-	// Dead Letter Exchange
-	err = ch.ExchangeDeclare(
-		"msgs.dead.letter", // name
-		"fanout",           // type
-		false,              // durable
-		false,              // auto-deleted
-		false,              // internal
-		false,              // no-wait
-		nil,                // arguments
-	)
-	failOnError(err, "Failed to declare an exchange")
-
 	args = make(amqp.Table)
-	args["x-message-ttl"] = int32(5000)
-	args["x-dead-letter-exchange"] = "msgs"
+	args["x-dead-letter-exchange"] = "dlx.exchange"
 	_, err = ch.QueueDeclare(
-		"msgs.retry", // name
-		false,        // durable
-		false,        // delete when unused
-		false,        // exclusive
-		false,        // no-wait
-		args,         // arguments
+		"standard.queue", // name
+		false,            // durable
+		false,            // delete when unused
+		false,            // exclusive
+		false,            // no-wait
+		args,             // arguments
 	)
 	failOnError(err, "Failed to declare a queue")
 
 	err = ch.QueueBind(
-		"msgs.retry",       // queue name
-		"",                 // routing key
-		"msgs.dead.letter", // exchange
+		"standard.queue",    // queue name
+		"#",                 // routing key
+		"standard.exchange", // exchange
 		false,
 		nil)
 	failOnError(err, "Failed to bind a queue")
+	err = ch.QueueBind(
+		"standard.queue", // queue name
+		"#",              // routing key
+		"dlx.exchange",   // exchange
+		false,
+		nil)
+	failOnError(err, "Failed to bind a queue")
+
+	// args = make(amqp.Table)
+	// // args["x-message-ttl"] = int32(5000)
+	// args["x-dead-letter-exchange"] = "msgs"
+	// _, err = ch.QueueDeclare(
+	// 	"msgs.retry", // name
+	// 	false,        // durable
+	// 	false,        // delete when unused
+	// 	false,        // exclusive
+	// 	false,        // no-wait
+	// 	args,         // arguments
+	// )
+	// failOnError(err, "Failed to declare a queue")
+
+	// err = ch.QueueBind(
+	// 	"msgs.retry",       // queue name
+	// 	"",                 // routing key
+	// 	"msgs.dead.letter", // exchange
+	// 	false,
+	// 	nil)
+	// failOnError(err, "Failed to bind a queue")
 
 	// -------------------------
 	// Get Messages from normal Queue
 	msgs, err := ch.Consume(
-		"msg", // queue
-		"",    // consumer
-		false, // auto-ack
-		false, // exclusive
-		false, // no-local
-		false, // no-wait
-		nil,   // args
+		"standard.queue", // queue
+		"",               // consumer
+		false,            // auto-ack
+		false,            // exclusive
+		false,            // no-local
+		false,            // no-wait
+		nil,              // args
 	)
 	failOnError(err, "Failed to register a consumer")
 
@@ -108,8 +117,9 @@ func main() {
 	// read message from queue
 	go func() {
 		for d := range msgs {
-			log.Printf("Received a message: %s\n", d.Body)
 			xdeath := d.Headers["x-death"]
+			log.Printf("Received a message: %s\n", d.Body)
+			log.Printf("Headerinfo: %+v\n", xdeath)
 
 			// check if death headers exist
 			if v, ok := d.Headers["x-death"]; ok {
@@ -120,14 +130,14 @@ func main() {
 					switch retry := xdeath.([]interface{})[0].(amqp.Table)["count"].(type) {
 					case int64:
 
-						// acknowledge only after 5 retries
-						if retry > int64(5) {
+						// acknowledge only after 3 retries
+						if retry >= int64(3) {
 							d.Ack(false)
 						} else {
 
 							// not 5 retries reached
 							// send message back to the dead letter exchange
-							fmt.Printf("%d\n\n", retry)
+							fmt.Printf("retry: %d\n\n", retry)
 							// d.ttl = int32(10000)
 							d.Nack(false, false)
 						}

@@ -29,12 +29,13 @@ func main() {
 	for msgs := 0; msgs < 10; msgs++ {
 		prio := rand.Intn(31)
 		err = ch.Publish(
-			"msgs", // exchange
-			"msg",  // routing key
-			false,  // mandatory
-			false,  // immediate
+			"standard.exchange", // exchange
+			"msg",               // routing key
+			false,               // mandatory
+			false,               // immediate
 			amqp.Publishing{
-				Headers:         amqp.Table{},
+				// Headers:         amqp.Table{},
+				Headers:         header,
 				ContentType:     "text/plain",
 				ContentEncoding: "",
 				Body:            []byte("test" + strconv.Itoa(msgs)),
